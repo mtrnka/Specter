@@ -1,4 +1,4 @@
-import sys 
+import sys
 import time
 import pandas as pd
 import pymzml
@@ -14,7 +14,7 @@ import random
 import itertools
 import cPickle as pickle
 from functools import partial
-import sparse_nnls 
+import sparse_nnls
 from pyspark import SparkConf,SparkContext
 import sqlite3
 import struct
@@ -283,34 +283,37 @@ if __name__ == "__main__":
     numPartitions = 200
     if len(args) >= 6:
         numPartitions = int(args[5])
-    
-    instrument = 'orbitrap'    
+
+    instrument = 'orbitrap'
     if len(args) >= 7:
         instrument=args[6]
 
     delta = 10
     if len(args) == 8:
     	delta=float(args[7])
-        
-    #Cast the spectral library as a dictionary  
-        
+
+#    outputDir = "gs://specter-dia/outputs"
+    outputDir = "/test-output"
+
+    #Cast the spectral library as a dictionary
+
     start = time.time()
-    
+
     libPath = os.path.expanduser(libName+'.blib')
     if os.path.exists(libPath):
         Lib = sqlite3.connect(libPath)
         LibPrecursorInfo = pd.read_sql("SELECT * FROM RefSpectra",Lib)
-    
+
         SpectraLibrary = {}
-    
+
         for i in range(len(LibPrecursorInfo)):
             precursorID = str(LibPrecursorInfo['id'][i])
             precursorKey = (LibPrecursorInfo['peptideModSeq'][i],LibPrecursorInfo['precursorCharge'][i]) 
             NumPeaks = pd.read_sql("SELECT numPeaks FROM RefSpectra WHERE id = "+precursorID,Lib)['numPeaks'][0]
-            
+
             SpectrumMZ = pd.read_sql("SELECT peakMZ FROM RefSpectraPeaks WHERE RefSpectraID = " + precursorID,Lib)['peakMZ'][0]
             SpectrumIntensities = pd.read_sql("SELECT peakIntensity FROM RefSpectraPeaks WHERE RefSpectraID = "+precursorID,Lib)['peakIntensity'][0]
-            
+
             if len(SpectrumMZ) == 8*NumPeaks and len(SpectrumIntensities) == 4*NumPeaks:
                 SpectraLibrary.setdefault(precursorKey,{})
                 SpectrumMZ = struct.unpack('d'*NumPeaks,SpectrumMZ)
@@ -339,17 +342,17 @@ if __name__ == "__main__":
                 SpectraLibrary[precursorKey]['Spectrum'] = np.array((SpectrumMZ,SpectrumIntensities)).T
                 SpectraLibrary[precursorKey]['PrecursorMZ'] = LibPrecursorInfo['precursorMZ'][i]
                 SpectraLibrary[precursorKey]['PrecursorRT'] = LibPrecursorInfo['retentionTime'][i]
-                
+
     else:
         SpectraLibrary = pickle.load(open(libName,"rb"))
-        
+
     print "Library loaded in {} minutes".format(round((time.time()-start)/60,1))
-    
-    path = os.path.expanduser(mzMLname+'.mzML')  
+
+    path = os.path.expanduser(mzMLname+'.mzML')
     DIArun = pymzml.run.Reader(path)
     E = enumerate(DIArun)
 
-    start = time.time()     
+    start = time.time()
 
     if StartOrEnd == "end":
         if instrument == 'orbitrap':
@@ -364,25 +367,24 @@ if __name__ == "__main__":
 
 
     print "Loaded {} MS2 spectra from {} in {} minutes.".format(len(res),path,round((time.time()-start)/60,1))
-    
+
     res=[[res[i][0],float(res[i][1]),float(res[i][2]),float(res[i][3]),float(res[i+1][1]) - float(res[i][1])] for i in range(len(res)-1)]
     header=[[x[1],x[2],x[3]] for x in res]
 
-    absolutePath = mzMLname.rsplit('/',1)[0]
-    noPathName = mzMLname.rsplit('/',1)[1]
-    if '/' in libName:
-        libName = libName.rsplit('/',1)[1]
+#    absolutePath = mzMLname.rsplit('/',1)[0]
+    noPathName = os.path.basename(mzMLname)
+    libName = os.path.basename(libName)
 
-    outputDir = os.path.expanduser(absolutePath+'/SpecterResults')
-    if not os.path.exists(outputDir):
-    	os.makedirs(outputDir)
+#    outputDir = os.path.expanduser(absolutePath+'/SpecterResults')
+#    if not os.path.exists(outputDir):
+#    	os.makedirs(outputDir)
 
-    headerPath = os.path.expanduser(absolutePath+'/SpecterResults/'+noPathName+'_'+libName+'_header.csv')     
-    
+    headerPath = os.path.join(outputDir,+noPathName+'_'+libName+'_header.csv')
+
     with open(headerPath, "ab") as f:
         writer = csv.writer(f)
-        writer.writerows(header)      
-           
+        writer.writerows(header)
+
     print "Output written to {}.".format(headerPath)
 
     MaxWindowPrecMZ = max(np.array([x[1] for x in res])) + max(np.array([x[4] for x in res]))
@@ -391,36 +393,36 @@ if __name__ == "__main__":
     SpectraLibrary = {k:SpectraLibrary[k] for k in SpectraLibrary if SpectraLibrary[k]['PrecursorMZ'] < MaxWindowPrecMZ}
 
     conf = (SparkConf().set("spark.driver.maxResultSize", "25g"))
-        
+
     sc = SparkContext(conf=conf,appName="Specter",pyFiles=['sparse_nnls.py'])
-    
+
     #Recast the library as a broadcast variable to improve performance
-    BroadcastLibrary = sc.broadcast(SpectraLibrary)  
-    
+    BroadcastLibrary = sc.broadcast(SpectraLibrary)
+
     res = sc.parallelize(res, numPartitions)
-    
-    output = res.mapPartitions(partial(RegressSpectraOntoLibrary, Library=BroadcastLibrary, tol=delta*1e-6, maxWindowOffset = MaxOffset)).collect()  
-    
+
+    output = res.mapPartitions(partial(RegressSpectraOntoLibrary, Library=BroadcastLibrary, tol=delta*1e-6, maxWindowOffset = MaxOffset)).collect()
+
     output = [[output[i][j][0],output[i][j][1],output[i][j][2],output[i][j][3],
                         output[i][j][4],output[i][j][5]] for i in range(len(output)) for j in range(len(output[i]))]
-    
-    outputPath = os.path.expanduser(absolutePath+'/SpecterResults/'+noPathName+'_'+libName+'_SpecterCoeffs.csv')     
-    
+
+    outputPath = os.path.join(outputDir,noPathName+'_'+libName+'_SpecterCoeffs.csv')
+
     with open(outputPath, "ab") as f:
         writer = csv.writer(f)
-        writer.writerows(output)      
-           
+        writer.writerows(output)
+
     print "Output written to {}.".format(outputPath)
 
     output = res.mapPartitions(partial(RegressSpectraOntoLibraryWithDecoys, Library=BroadcastLibrary, tol=delta*1e-6, maxWindowOffset = MaxOffset)).collect()  
-    
+
     output = [[output[i][j][0],output[i][j][1],output[i][j][2],output[i][j][3],
                         output[i][j][4],output[i][j][5]] for i in range(len(output)) for j in range(len(output[i]))]
-    
-    outputPath = os.path.expanduser(absolutePath+'/SpecterResults/'+noPathName+'_'+libName+'_SpecterCoeffsDecoys.csv')     
-    
+
+    outputPath = os.path.join(outputDir,+noPathName+'_'+libName+'_SpecterCoeffsDecoys.csv')
+
     with open(outputPath, "ab") as f:
         writer = csv.writer(f)
-        writer.writerows(output)      
-           
+        writer.writerows(output)
+
     print "Output written to {}.".format(outputPath)
