@@ -379,7 +379,7 @@ if __name__ == "__main__":
 #    if not os.path.exists(outputDir):
 #    	os.makedirs(outputDir)
 
-    headerPath = os.path.join(outputDir,+noPathName+'_'+libName+'_header.csv')
+    headerPath = os.path.join(outputDir, noPathName + '_' + libName + '_header.csv')
 
     with open(headerPath, "ab") as f:
         writer = csv.writer(f)
@@ -406,7 +406,7 @@ if __name__ == "__main__":
     output = [[output[i][j][0],output[i][j][1],output[i][j][2],output[i][j][3],
                         output[i][j][4],output[i][j][5]] for i in range(len(output)) for j in range(len(output[i]))]
 
-    outputPath = os.path.join(outputDir,noPathName+'_'+libName+'_SpecterCoeffs.csv')
+    outputPath = os.path.join(outputDir, noPathName + '_' + libName + '_SpecterCoeffs.csv')
 
     with open(outputPath, "ab") as f:
         writer = csv.writer(f)
@@ -419,7 +419,7 @@ if __name__ == "__main__":
     output = [[output[i][j][0],output[i][j][1],output[i][j][2],output[i][j][3],
                         output[i][j][4],output[i][j][5]] for i in range(len(output)) for j in range(len(output[i]))]
 
-    outputPath = os.path.join(outputDir,+noPathName+'_'+libName+'_SpecterCoeffsDecoys.csv')
+    outputPath = os.path.join(outputDir, noPathName + '_' + libName + '_SpecterCoeffsDecoys.csv')
 
     with open(outputPath, "ab") as f:
         writer = csv.writer(f)
