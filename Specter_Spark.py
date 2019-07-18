@@ -15,7 +15,7 @@ import itertools
 import cPickle as pickle
 from functools import partial
 import sparse_nnls
-from pyspark import SparkConf,SparkContext
+from pyspark import SparkConf,SparkContext,SparkFiles
 import sqlite3
 import struct
 import zlib
@@ -265,21 +265,21 @@ def RegressSpectraOntoLibraryWithDecoys(DIASpectraIterator,Library,tol,maxWindow
 
 
 if __name__ == "__main__":
-    
+
     args = sys.argv
 
     mzMLname = args[1]  #dirName = args[1]
-    
+
     libName = args[2]
-    
-    Index = 0       
+
+    Index = 0
     if len(args) >= 4:
         Index = int(args[3])
-    
-    StartOrEnd = "start" 
+
+    StartOrEnd = "start"
     if len(args) >= 5:
         StartOrEnd = args[4]
-    
+
     numPartitions = 200
     if len(args) >= 6:
         numPartitions = int(args[5])
@@ -292,8 +292,8 @@ if __name__ == "__main__":
     if len(args) == 8:
     	delta=float(args[7])
 
-#    outputDir = "gs://specter-dia/outputs"
-    outputDir = "/test-output"
+    outputDir = "gs://specter-dia/data/outputs"
+#    outputDir = "/test-output"
 
     #Cast the spectral library as a dictionary
 
