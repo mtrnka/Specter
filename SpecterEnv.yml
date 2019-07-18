@@ -40,7 +40,6 @@ dependencies:
   - readline=6.2=2
   - requests=2.18.4=py27hc5b0589_1
   - scipy=0.18.1=np111py27_0
-  - setuptools=27.2.0=py27_0
   - six=1.11.0=py27h5f960f1_1
   - sqlite=3.13.0=0
   - tk=8.5.18=0
