@@ -292,15 +292,17 @@ if __name__ == "__main__":
     if len(args) == 8:
     	delta=float(args[7])
 
-    outputDir = "gs://specter-dia/data/outputs"
-#    outputDir = "/test-output"
+#    outputDir = "gs://specter-dia/data/outputs"
+    outputDir = "/test-output"
 
     #Cast the spectral library as a dictionary
 
     start = time.time()
 
-    libPath = os.path.expanduser(libName+'.blib')
-    if os.path.exists(libPath):
+    libPath = os.path.abspath(libName)
+    picklePath = libPath.replace(".blib",".pickle")
+    if not os.path.exists(picklePath):
+#    if os.path.exists(libPath):
         Lib = sqlite3.connect(libPath)
         LibPrecursorInfo = pd.read_sql("SELECT * FROM RefSpectra",Lib)
 
@@ -343,12 +345,14 @@ if __name__ == "__main__":
                 SpectraLibrary[precursorKey]['PrecursorMZ'] = LibPrecursorInfo['precursorMZ'][i]
                 SpectraLibrary[precursorKey]['PrecursorRT'] = LibPrecursorInfo['retentionTime'][i]
 
+            pickle.dump(SpectraLibrary, open(picklePath,"wb"))
+
     else:
-        SpectraLibrary = pickle.load(open(libName,"rb"))
+        SpectraLibrary = pickle.load(open(picklePath,"rb"))
 
     print "Library loaded in {} minutes".format(round((time.time()-start)/60,1))
 
-    path = os.path.expanduser(mzMLname+'.mzML')
+    path = os.path.abspath(mzMLname)
     DIArun = pymzml.run.Reader(path)
     E = enumerate(DIArun)
 
@@ -372,14 +376,15 @@ if __name__ == "__main__":
     header=[[x[1],x[2],x[3]] for x in res]
 
 #    absolutePath = mzMLname.rsplit('/',1)[0]
-    noPathName = os.path.basename(mzMLname)
-    libName = os.path.basename(libName)
+    noPathName = os.path.basename(mzMLname).replace(".mzML","")
+    libName = os.path.basename(libName).replace(".blib","")
+    baseName = noPathName + '_' + libName
 
 #    outputDir = os.path.expanduser(absolutePath+'/SpecterResults')
 #    if not os.path.exists(outputDir):
 #    	os.makedirs(outputDir)
 
-    headerPath = os.path.join(outputDir, noPathName + '_' + libName + '_header.csv')
+    headerPath = os.path.join(outputDir, baseName + '_header.csv')
 
     with open(headerPath, "ab") as f:
         writer = csv.writer(f)
@@ -406,23 +411,37 @@ if __name__ == "__main__":
     output = [[output[i][j][0],output[i][j][1],output[i][j][2],output[i][j][3],
                         output[i][j][4],output[i][j][5]] for i in range(len(output)) for j in range(len(output[i]))]
 
-    outputPath = os.path.join(outputDir, noPathName + '_' + libName + '_SpecterCoeffs.csv')
+    scPath = os.path.join(outputDir, baseName + '_SpecterCoeffs.csv')
 
-    with open(outputPath, "ab") as f:
+    with open(scPath, "ab") as f:
         writer = csv.writer(f)
         writer.writerows(output)
 
-    print "Output written to {}.".format(outputPath)
+    print "Output written to {}.".format(scPath)
 
     output = res.mapPartitions(partial(RegressSpectraOntoLibraryWithDecoys, Library=BroadcastLibrary, tol=delta*1e-6, maxWindowOffset = MaxOffset)).collect()  
 
     output = [[output[i][j][0],output[i][j][1],output[i][j][2],output[i][j][3],
                         output[i][j][4],output[i][j][5]] for i in range(len(output)) for j in range(len(output[i]))]
 
-    outputPath = os.path.join(outputDir, noPathName + '_' + libName + '_SpecterCoeffsDecoys.csv')
+    scdPath = os.path.join(outputDir, baseName + '_SpecterCoeffsDecoys.csv')
 
-    with open(outputPath, "ab") as f:
+    with open(scdPath, "ab") as f:
         writer = csv.writer(f)
         writer.writerows(output)
 
-    print "Output written to {}.".format(outputPath)
+    print "Output written to {}.".format(scdPath)
+
+    print "Running SpecterQuant.R"
+    pathToSpecterQuant = "/usr/local/share/Specter/SpecterQuant.R"
+    executeSpecterQuant = "Rscript %s %s %s %s %s" %(pathToSpecterQuant, headerPath, scPath, scdPath, outputDir)
+    os.system(executeSpecterQuant)
+
+    print "Moving results to cloud storage"
+    cloudStorageLocation = "gs://specter-dia/data/output/"
+    executeMove = "gsutil cp -r %s* %s" %(baseName, cloudStorageLocation)
+    os.system(executeMove)
+
+    print "deleting local files"
+    executeDelete = "rm %s*" %(baseName)
+

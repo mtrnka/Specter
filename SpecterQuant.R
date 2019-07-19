@@ -310,16 +310,20 @@ EnoughData = function(Data,Identifiers,i,RTWindow=TRUE) {
 library(MASS)
 library(data.table)
 args=commandArgs(TRUE)
-mzmlPath = paste0(args[1],".mzML")
-dirName = strsplit(mzmlPath,split="/")[[1]]
-mzmlName= gsub(".mzML","",dirName[length(dirName)])
-libName = strsplit(args[2],split="/")[[1]]
-libName = libName[length(libName)]
-dirName = dirName[-length(dirName)]
-dirName = paste(dirName,collapse="/")
-resultsPath = file.path(dirName, "SpecterResults", paste0(mzmlName, "_", libName, "_SpecterCoeffs.csv"))
-headerPath = file.path(dirName, "SpecterResults", paste0(mzmlName, "_", libName, "_header.csv"))
-decoyResultsPath = paste0(gsub(".csv","",resultsPath),"Decoys.csv")
+#mzmlPath = paste0(args[1],".mzML")
+#dirName = strsplit(mzmlPath,split="/")[[1]]
+#mzmlName= gsub(".mzML","",dirName[length(dirName)])
+#libName = strsplit(args[2],split="/")[[1]]
+#libName = libName[length(libName)]
+#dirName = dirName[-length(dirName)]
+#dirName = paste(dirName,collapse="/")
+#resultsPath = file.path(dirName, "SpecterResults", paste0(mzmlName, "_", libName, "_SpecterCoeffs.csv"))
+#headerPath = file.path(dirName, "SpecterResults", paste0(mzmlName, "_", libName, "_header.csv"))
+#decoyResultsPath = paste0(gsub(".csv","",resultsPath),"Decoys.csv")
+
+headerPath = args[1]
+resultsPath = args[2]
+decoyResultsPath = args[3]
 
 h = read.csv(headerPath,header=FALSE,stringsAsFactors=FALSE)
 names(h) = c("precursorMZ","retentionTime","seqNum")
