@@ -13,7 +13,7 @@ gcloud dataproc clusters create $1 \
  --worker-machine-type n1-highmem-8 \
  --worker-boot-disk-size 100GB \
  --worker-boot-disk-type pd-ssd \
- --num-workers 4
+ --num-workers 4 \
  --num-preemptible-workers 4
 
 
