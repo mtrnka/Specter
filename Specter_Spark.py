@@ -289,20 +289,25 @@ if __name__ == "__main__":
         instrument=args[6]
 
     delta = 10
-    if len(args) == 8:
+    if len(args) >= 8:
     	delta=float(args[7])
 
+    runSpecterQuant = False
+    if len(args) == 9:
+      runSpecterQuant=args[8].lower() == 'true'
+
 #    outputDir = "gs://specter-dia/data/outputs"
-    outputDir = "/test-output"
+    outputDir = "/specter-output"
 
     #Cast the spectral library as a dictionary
 
     start = time.time()
 
     libPath = os.path.abspath(libName)
-    picklePath = libPath.replace(".blib",".pickle")
+    picklePath = os.path.join(outputDir, os.path.basename(libName).replace(".blib",".pickle"))
     if not os.path.exists(picklePath):
 #    if os.path.exists(libPath):
+        print "loading spectral library"
         Lib = sqlite3.connect(libPath)
         LibPrecursorInfo = pd.read_sql("SELECT * FROM RefSpectra",Lib)
 
@@ -345,7 +350,8 @@ if __name__ == "__main__":
                 SpectraLibrary[precursorKey]['PrecursorMZ'] = LibPrecursorInfo['precursorMZ'][i]
                 SpectraLibrary[precursorKey]['PrecursorRT'] = LibPrecursorInfo['retentionTime'][i]
 
-            pickle.dump(SpectraLibrary, open(picklePath,"wb"))
+        pickle.dump(SpectraLibrary, open(picklePath,"wb"))
+        print "Writing library to pickle: {}".format(picklePath)
 
     else:
         SpectraLibrary = pickle.load(open(picklePath,"rb"))
@@ -432,16 +438,22 @@ if __name__ == "__main__":
 
     print "Output written to {}.".format(scdPath)
 
-    print "Running SpecterQuant.R"
-    pathToSpecterQuant = "/usr/local/share/Specter/SpecterQuant.R"
-    executeSpecterQuant = "Rscript %s %s %s %s %s" %(pathToSpecterQuant, headerPath, scPath, scdPath, outputDir)
-    os.system(executeSpecterQuant)
+    if runSpecterQuant:
+        print "Running SpecterQuant.R"
+        pathToSpecterQuant = "/usr/local/share/Specter/SpecterQuant.R"
+        executeSpecterQuant = "Rscript %s %s %s %s %s" %(pathToSpecterQuant, headerPath, scPath, scdPath, outputDir)
+        os.system(executeSpecterQuant)
 
-    print "Moving results to cloud storage"
-    cloudStorageLocation = "gs://specter-dia/data/output/"
-    executeMove = "gsutil cp -r %s* %s" %(baseName, cloudStorageLocation)
-    os.system(executeMove)
+        print "Moving results to cloud storage"
+        cloudStorageLocation = "gs://specter-dia/data/output/"
+        executeMove = "gsutil cp -r %s* %s" %(os.path.join(outputDir, baseName), cloudStorageLocation)
+        print executeMove
+        os.system(executeMove)
 
-    print "deleting local files"
-    executeDelete = "rm %s*" %(baseName)
+#    print "deleting local files"
+#    executeDelete = "rm %s*" %(os.path.join(outputDir, baseName))
+#    print executeDelete
+#    os.system(executeDelete)
+
+
 

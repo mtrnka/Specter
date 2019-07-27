@@ -1,3 +1,6 @@
+require(data.table)
+setDTthreads(threads=8)
+
 SparkSpecterCoeffs = function(rawCoeffsFilepath,ExperimentHeader=NULL, lib=NULL,MS1=FALSE)
 { library(data.table)
   

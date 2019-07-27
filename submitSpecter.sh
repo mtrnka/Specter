@@ -1,17 +1,45 @@
-for i in $( gsutil ls gs://specter-dia/data | head -n 25 | tail -n 3)
+#!/bin/bash
+blib="gs://specter-dia/blibs/PC3_insilicoLib_A.blib"
+
+while IFS= read -r line;
+#for i in $( gsutil ls gs://specter-dia/data | head -n 35)
 do
-  if [[ $i == *.mzML ]]
+  if [[ $line == *.mzML ]]
     then
       gcloud dataproc jobs submit pyspark \
-      /Users/mtrnka/Projects-Mine/SpectraNet/specter/Specter/debug.py \
+      /Users/mtrnka/Projects-Mine/SpectraNet/specter/Specter/Specter_Spark.py \
       --cluster $1 \
       --bucket specter-dia \
-      --files $i,gs://specter-dia/SpecTest/PC3_DDAPhosphoLibrary.redundant.blib \
-      --properties='spark.driver.memory=15G','spark.executor.memory=20G' \
+      --files $line,$blib \
+      --properties=\
+'spark.executor.memory=27G',\
+'spark.executor.memoryOverhead=2G',\
+'spark.executor.cores=4',\
+'spark.driver.memory=27G',\
+'spark.driver.cores=4',\
+'spark.default.parallelism=120'\
       --py-files /Users/mtrnka/Projects-Mine/SpectraNet/specter/Specter/sparse_nnls.py \
       --project specter1 \
-      -- ${i#gs://specter-dia/data/} \
-         PC3_DDAPhosphoLibrary.redundant.blib \
-         0 start 20000 orbitrap 10
+      -- ${line#gs://specter-dia/data/} \
+         ${blib#gs://specter-dia/blibs/} \
+         22000 end 5000 orbitrap 10 False
+
+      gcloud dataproc jobs submit pyspark \
+      /Users/mtrnka/Projects-Mine/SpectraNet/specter/Specter/Specter_Spark.py \
+      --cluster $1 \
+      --bucket specter-dia \
+      --files $line,$blib \
+      --properties=\
+'spark.executor.memory=27G',\
+'spark.executor.memoryOverhead=2G',\
+'spark.executor.cores=4',\
+'spark.driver.memory=27G',\
+'spark.driver.cores=8',\
+'spark.default.parallelism=120'\
+      --py-files /Users/mtrnka/Projects-Mine/SpectraNet/specter/Specter/sparse_nnls.py \
+      --project specter1 \
+      -- ${line#gs://specter-dia/data/} \
+         ${blib#gs://specter-dia/blibs/} \
+         22001 start 5000 orbitrap 10 True
   fi
-done
+done < "$2"
